@@ -23,6 +23,7 @@ THE SOFTWARE.
 ****************************************************************************/
 
 #ifndef __CC_PLATFORM_IMAGE_CPP__
+//如果没有定义基于平台的CCImage的CPP标记宏，编译时打印出错。
 #error "CCFileUtilsCommon_cpp.h can only be included for CCFileUtils.cpp in platform/win32(android,...)"
 #endif /* __CC_PLATFORM_IMAGE_CPP__ */
 
@@ -30,8 +31,11 @@ THE SOFTWARE.
 #include "CCCommon.h"
 #include "CCStdC.h"
 #include "CCFileUtils.h"
+//libpng库的头文件  
 #include "png.h"
+//libjpg库的头文件
 #include "jpeglib.h"
+//libtiff库的头文件  
 #include "tiffio.h"
 #include <string>
 #include <ctype.h>
@@ -40,11 +44,12 @@ THE SOFTWARE.
 #include <SDL/SDL.h>
 #include <SDL/SDL_image.h>
 #endif // EMSCRIPTEN
-
+//使用Cocos2d命名空间
 NS_CC_BEGIN
 
 // premultiply alpha, or the effect will wrong when want to use other pixel format in CCTexture2D,
 // such as RGB888, RGB5A1
+//定义宏从RGB888或RGB5A1像素格式数据中返回一个RGBA8888的像素格式数据。  
 #define CC_RGB_PREMULTIPLY_ALPHA(vr, vg, vb, va) \
     (unsigned)(((unsigned)((unsigned char)(vr) * ((unsigned char)(va) + 1)) >> 8) | \
     ((unsigned)((unsigned char)(vg) * ((unsigned char)(va) + 1) >> 8) << 8) | \
@@ -52,18 +57,22 @@ NS_CC_BEGIN
     ((unsigned)(unsigned char)(va) << 24))
 
 // on ios, we should use platform/ios/CCImage_ios.mm instead
-
+//图片文件数据的信息结构
 typedef struct 
 {
     unsigned char* data;
     int size;
     int offset;
 }tImageSource;
-
+//读取PNG文件数据的回调函数
+//参1:PNG文件数据指针
+//参2:返回的图片数据地址
+//参3:要从PNG文件中读取的图片数据的长度，其值 = 每像素字节数X图片的宽X图片的高。
 static void pngReadCallback(png_structp png_ptr, png_bytep data, png_size_t length)
 {
+     //从一个PNG文件数据指针指针中返回图片文件数据的信息结构  
     tImageSource* isource = (tImageSource*)png_get_io_ptr(png_ptr);
-
+    //如果要读取的长度有效。则将相应长度的图像数据拷贝到返回的图片数据地址中。
     if((int)(isource->offset + length) <= isource->size)
     {
         memcpy(data, isource->data+isource->offset, length);
@@ -78,7 +87,7 @@ static void pngReadCallback(png_structp png_ptr, png_bytep data, png_size_t leng
 //////////////////////////////////////////////////////////////////////////
 // Implement CCImage
 //////////////////////////////////////////////////////////////////////////
-
+//构造函数  
 CCImage::CCImage()
 : m_nWidth(0)
 , m_nHeight(0)
@@ -89,12 +98,13 @@ CCImage::CCImage()
 {
 
 }
-
+//析构函数  
 CCImage::~CCImage()
 {
+    //释放图像数据占用的内存 
     CC_SAFE_DELETE_ARRAY(m_pData);
 }
-
+//从指定的路径载入一个所支持的格式的图片文件。
 bool CCImage::initWithImageFile(const char * strPath, EImageFormat eImgFmt/* = eFmtPng*/)
 {
     bool bRet = false;
@@ -120,31 +130,43 @@ bool CCImage::initWithImageFile(const char * strPath, EImageFormat eImgFmt/* = e
     SDL_FreeSurface(iSurf);
 #else
     unsigned long nSize = 0;
+    //调用文件操作函数库中的函数读取相应路径的文件到内存中，并返回内存的地址给指针变量pBuffer。  
     std::string fullPath = CCFileUtils::sharedFileUtils()->fullPathForFilename(strPath);
     unsigned char* pBuffer = CCFileUtils::sharedFileUtils()->getFileData(fullPath.c_str(), "rb", &nSize);
     if (pBuffer != NULL && nSize > 0)
     {
+         //如果读取成功，则将内存地址做为参数调用initWithImageData函数来加载图片数据。 
         bRet = initWithImageData(pBuffer, nSize, eImgFmt);
     }
+     //释放读取文件所创建的内存。
     CC_SAFE_DELETE_ARRAY(pBuffer);
 #endif // EMSCRIPTEN
 
     return bRet;
 }
-
+//从指定的路径载入一个所支持的格式的图片文件,但它是线程安全的,因此可以用在多线程加载图片。  
 bool CCImage::initWithImageFileThreadSafe(const char *fullpath, EImageFormat imageType)
 {
     bool bRet = false;
     unsigned long nSize = 0;
+    //调用文件操作函数库中的函数读取相应路径的文件到内存中，并返回内存的地址给指针变量pBuffer。
     unsigned char *pBuffer = CCFileUtils::sharedFileUtils()->getFileData(fullpath, "rb", &nSize);
     if (pBuffer != NULL && nSize > 0)
     {
+        //如果读取成功，则将内存地址做为参数调用initWithImageData函数来加载图片数据。 
         bRet = initWithImageData(pBuffer, nSize, imageType);
     }
+    //释放读取文件所创建的内存。
     CC_SAFE_DELETE_ARRAY(pBuffer);
     return bRet;
 }
-
+//从内存中加载图片数据。
+//参1:指向图片数据所处内存地址的指针。
+//参2:图片数据长度
+//参3:数据对应图片的格式，
+//参4:数据对应图片的宽度
+//参5:数据对应图片的高度
+//参6:每像素的字节位数,即色深。
 bool CCImage::initWithImageData(void * pData, 
                                 int nDataLen, 
                                 EImageFormat eFmt/* = eSrcFmtPng*/, 
@@ -155,20 +177,24 @@ bool CCImage::initWithImageData(void * pData,
     bool bRet = false;
     do 
     {
+        //参数有效性判断
         CC_BREAK_IF(! pData || nDataLen <= 0);
-
+        //根据不同的图片数据格式调用不同的函数创建相应的图片数据。  
         if (kFmtPng == eFmt)
         {
+            //读取PNG格式的图片数据。  
             bRet = _initWithPngData(pData, nDataLen);
             break;
         }
         else if (kFmtJpg == eFmt)
         {
+            //读取JPG格式的图片数据。
             bRet = _initWithJpgData(pData, nDataLen);
             break;
         }
         else if (kFmtTiff == eFmt)
         {
+            //读取TIFF格式的图片数据。
             bRet = _initWithTiffData(pData, nDataLen);
             break;
         }
@@ -179,11 +205,14 @@ bool CCImage::initWithImageData(void * pData,
         }
         else if (kFmtRawData == eFmt)
         {
+            //读取RGBA8888格式的图片数据。
             bRet = _initWithRawData(pData, nDataLen, nWidth, nHeight, nBitsPerComponent, false);
             break;
         }
         else
         {
+            // 如果未指定数据的格式.则通过对比相应格式的文件头信息判断格式。
+            //判断是否是PNG
             // if it is a png file buffer.
             if (nDataLen > 8)
             {
@@ -197,11 +226,12 @@ bool CCImage::initWithImageData(void * pData,
                     && pHead[6] == 0x1A
                     && pHead[7] == 0x0A)
                 {
+                    //通过对比如果是属于PNG格式则读取PNG格式的图片数据  
                     bRet = _initWithPngData(pData, nDataLen);
                     break;
                 }
             }
-
+            //判断是否是TIFF  
             // if it is a tiff file buffer.
             if (nDataLen > 2)
             {
@@ -210,11 +240,12 @@ bool CCImage::initWithImageData(void * pData,
                     || (pHead[0] == 0x4d && pHead[1] == 0x4d)
                     )
                 {
+                    //通过对比如果是属于TIFF格式则读取TIFF格式的图片数据
                     bRet = _initWithTiffData(pData, nDataLen);
                     break;
                 }
             }
-
+            //判断是否是JPG 
             // if it is a jpeg file buffer.
             if (nDataLen > 2)
             {
@@ -279,9 +310,10 @@ my_error_exit (j_common_ptr cinfo)
   /* Return control to the setjmp point */
   longjmp(myerr->setjmp_buffer, 1);
 }
-
+//读取JPG格式的图片数据。 
 bool CCImage::_initWithJpgData(void * data, int nSize)
 {
+    //此处使用libjpeg库来读取JPG，这里需要建立相应的结构变量。  
     /* these are standard libjpeg structures for reading(decompression) */
     struct jpeg_decompress_struct cinfo;
     /* We use our private extension JPEG error handler.
@@ -295,8 +327,9 @@ bool CCImage::_initWithJpgData(void * data, int nSize)
     unsigned int i = 0;
 
     bool bRet = false;
-    do 
+    do
     {
+        //下面是使用libjpeg来进行JPG格式数据的读取。
         /* We set up the normal JPEG error routines, then override error_exit. */
 		cinfo.err = jpeg_std_error(&jerr.pub);
 		jerr.pub.error_exit = my_error_exit;
@@ -322,7 +355,7 @@ bool CCImage::_initWithJpgData(void * data, int nSize)
 #else
         jpeg_read_header( &cinfo, true );
 #endif
-
+        // JPG只能支持RGB的像素格式  
         // we only support RGB or grayscale
         if (cinfo.jpeg_color_space != JCS_RGB)
         {
@@ -335,10 +368,10 @@ bool CCImage::_initWithJpgData(void * data, int nSize)
         {
             break;
         }
-
+        //开始解压JPG。 
         /* Start decompression jpeg here */
         jpeg_start_decompress( &cinfo );
-
+        //设置相应成员变量。
         /* init image info */
         m_nWidth  = (short)(cinfo.output_width);
         m_nHeight = (short)(cinfo.output_height);
@@ -347,17 +380,19 @@ bool CCImage::_initWithJpgData(void * data, int nSize)
         m_nBitsPerComponent = 8;
         row_pointer[0] = new unsigned char[cinfo.output_width*cinfo.output_components];
         CC_BREAK_IF(! row_pointer[0]);
-
+        //为图片数据指针申请相应大小的内存。 
         m_pData = new unsigned char[cinfo.output_width*cinfo.output_height*cinfo.output_components];
         CC_BREAK_IF(! m_pData);
-
+        //将像素信息读取到图片数据指针指向的内存中。
         /* now actually read the jpeg into the raw buffer */
         /* read one scan line at a time */
         while( cinfo.output_scanline < cinfo.output_height )
         {
+             //每次读取一个扫描行的像素信息 
             jpeg_read_scanlines( &cinfo, row_pointer, 1 );
             for( i=0; i<cinfo.output_width*cinfo.output_components;i++) 
             {
+                //将读取到的像素信息存入相应的内存中。  
                 m_pData[location++] = row_pointer[0][i];
             }
         }
@@ -367,16 +402,18 @@ bool CCImage::_initWithJpgData(void * data, int nSize)
 		 * with the decompression object.
 		 * So it doesn't need to call jpeg_finish_decompress().
 		 */
+         //完成解压  
 		//jpeg_finish_decompress( &cinfo );
+        //释放所用的结构  
         jpeg_destroy_decompress( &cinfo );
         /* wrap up decompression, destroy objects, free pointers and close open files */        
         bRet = true;
     } while (0);
-
+    //释放申请的内存  
     CC_SAFE_DELETE_ARRAY(row_pointer[0]);
     return bRet;
 }
-
+//读取PNG格式的图片数据。
 bool CCImage::_initWithPngData(void * pData, int nDatalen)
 {
 // length of bytes to check if it is a valid png file

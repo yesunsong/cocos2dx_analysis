@@ -174,30 +174,51 @@ public:
     @param    pszFilePath        the file's absolute path, including file suffix.
     @param    bIsToRGB        whether the image is saved as RGB format.
     */
+    //将当前图片数据保存成指定的文件格式。
+    //参1:绝对路径名
+    //参2:是否保存成RGB格式
     bool saveToFile(const char *pszFilePath, bool bIsToRGB = true);
-
+    //定义变量m_nWidth和get接口 
     CC_SYNTHESIZE_READONLY(unsigned short,   m_nWidth,       Width);
+    //定义变量m_nHeight和get接口 
     CC_SYNTHESIZE_READONLY(unsigned short,   m_nHeight,      Height);
+    //定义变量m_nBitsPerComponent和get接口
     CC_SYNTHESIZE_READONLY(int,     m_nBitsPerComponent,   BitsPerComponent);
 
 protected:
+    //读取JPG图片数据
+    //参1:数据地址
+    //参2:数据长度
     bool _initWithJpgData(void *pData, int nDatalen);
+     //读取PNG图片数据到内存成成Cocos2d-x所用的图像数据保存到m_pData中 
     bool _initWithPngData(void *pData, int nDatalen);
+    //读取TIFF图片数据到内存成成Cocos2d-x所用的图像数据保存到m_pData中
     bool _initWithTiffData(void *pData, int nDataLen);
+    //读取Webp图片数据到内存成成Cocos2d-x所用的图像数据保存到m_pData中
     bool _initWithWebpData(void *pData, int nDataLen);
     // @warning kFmtRawData only support RGBA8888
+    //读取RGBA8888格式的图片数据。
+    //参1:数据地址
+    //参2:数据长度
+    //参3:图片宽度
+    //参4:图片高度
+    //参5:图片色深
     bool _initWithRawData(void *pData, int nDatalen, int nWidth, int nHeight, int nBitsPerComponent, bool bPreMulti);
-
+    //将图像数据保存为PNG图片  
     bool _saveImageToPNG(const char *pszFilePath, bool bIsToRGB = true);
+    //将图像数据保存为JPG图片 
     bool _saveImageToJPG(const char *pszFilePath);
-
+    //图像数据地址 
     unsigned char *m_pData;
+    //是否有Alpha 
     bool m_bHasAlpha;
+    //是否有Alpha渐变 
     bool m_bPreMulti;
 
 
 private:
     // noncopyable
+    // 拷贝构造与重载等号拷贝  
     CCImage(const CCImage&    rImg);
     CCImage & operator=(const CCImage&);
 };
